@@ -208,7 +208,7 @@ interface IEEE (supported : Type -> Prop) where
         FloatFormat
 
   ||| The format of the values returned by `logB`.
-  ||| 
+  |||
   ||| Note: The type `logBty i` *must* be able to represent the integers
   ||| from `-2*(emax (fmt i) + prec (fmt i))` to `2*(emax (fmt i) + prec (fmt i))`
   ||| faithfully.
@@ -263,7 +263,7 @@ interface IEEE (supported : Type -> Prop) where
   |||    - `-inf` if `x` is `-inf`,
   |||    - the biggest finite number if `x` is `+inf`, and
   |||    - a NaN if `x` is a NaN.
-  ||| 
+  |||
   ||| Note: `nextDown x` equals `negate (nextUp (negate x))`.
   nextDown : cast $ supported a =>
              a -> a
@@ -284,7 +284,7 @@ interface IEEE (supported : Type -> Prop) where
   ||| to have the same sign as `x`.
   remainder : cast $ supported a =>
               a -> a -> a
-  
+
   ------------------------------
   -- 5.3.2 Decimal operations --
   ------------------------------
