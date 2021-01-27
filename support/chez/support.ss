@@ -1,3 +1,5 @@
+#!chezscheme
+
 (define (blodwen-os)
   (case (machine-type)
     [(i3le ti3le a6le ta6le) "unix"]  ; GNU/Linux
@@ -467,3 +469,51 @@
         (when x
           (((cdr x) (car x)) 'erased)
           (run))))))
+
+; IEEE-754 floating-point numbers
+(define bool->int (lambda (x) (if x 1 0)))
+(define comp (lambda (f g) (lambda (x) (f (g x)))))
+
+(define ieee_radix 2)
+(define ieee_min_exponent -1023)
+(define ieee_positive_infinity +inf.0)
+(define ieee_negative_infinity -inf.0)
+(define ieee_smallest_positive_normal_number (inexact (expt ieee_radix ieee_min_exponent)))
+
+(define-syntax keep-zero-and-nonfinite
+  (syntax-rules ()
+    ((_ x body)
+     (if (or (not (flfinite? x))
+             (flzero? x))
+         x
+         body))))
+(define ieee_roundTiesToEven (lambda (x)
+                               (keep-zero-and-nonfinite x (flround x))))
+(define ieee_roundTiesAwayFromZero (lambda (x)
+                                     (keep-zero-and-nonfinite x
+                                                             (let* ((y (flround x))
+                                                                    (r (fl- y x)))
+                                                               (cond
+                                                                 ((and (fl=? r 0.5)
+                                                                       (flnegative? x))
+                                                                  (fl- y 1.0))
+                                                                 ((and (fl=? r -0.5)
+                                                                       (flpositive? x))
+                                                                  (fl+ y 1.0))
+                                                                 (#t y) ; no tie
+                                                                 )))))
+(define ieee_roundToZero fltruncate)
+(define ieee_roundToPos flfloor)
+(define ieee_roundToNeg flceiling)
+
+;(define ieee_isSignMinus ($primitive flonum-sign))
+(define ieee_isSignMinus #%$flonum-sign)
+(define ieee_isNormal (lambda (x) (bool->int (and (flfinite? x)
+                                                  (not (flzero? x))
+                                                  (fl<=? ieee_smallest_positive_normal_number (flabs x))))))
+(define ieee_isFinite (comp bool->int flfinite?))
+(define ieee_isZero (comp bool->int flzero?))
+(define ieee_isSubnormal (lambda (x) (bool->int #f)))
+(define ieee_isInfinite (comp bool->int flinfinite?))
+(define ieee_isNaN (comp bool->int flnan?))
+(define ieee_isSignaling (lambda (x) (bool->int #f)))
