@@ -474,11 +474,42 @@
 (define bool->int (lambda (x) (if x 1 0)))
 (define comp (lambda (f g) (lambda (x) (f (g x)))))
 
+(define encode-float
+  (lambda (m e s)
+    (inexact (* s m (expt 2 e)))))
+
+;flonums conform to IEEE binary64 format
 (define ieee_radix 2)
-(define ieee_min_exponent -1023)
+(define ieee_precision 53)
+(define ieee_max_exponent 1023)
+(define ieee_min_exponent (- 1 ieee_max_exponent))
+
+;useful constants
 (define ieee_positive_infinity +inf.0)
 (define ieee_negative_infinity -inf.0)
-(define ieee_smallest_positive_normal_number (inexact (expt ieee_radix ieee_min_exponent)))
+
+(define ieee_smallest_positive_number
+  (encode-float 1
+                (- ieee_min_exponent (1- ieee_precision))
+                1))
+(define ieee_biggest_negative_number
+  (fl- ieee_smallest_positive_number))
+
+(define ieee_smallest_positive_normal_number
+  (encode-float 1 ieee_min_exponent 1))
+(define ieee_biggest_negative_normal_number
+  (fl- ieee_smallest_positive_normal_number))
+
+(define ieee_biggest_finite_number
+  (encode-float (1- (expt 2 ieee_precision))
+                (- ieee_max_exponent (1- ieee_precision))
+                1))
+(define ieee_smallest_finite_number
+  (fl- ieee_biggest_finite_number))
+
+(define ieee_strictly_equal
+  (lambda (x y)
+    (bool->int (equal? (decode-float x) (decode-float y)))))
 
 (define-syntax keep-zero-and-nonfinite
   (syntax-rules ()
@@ -505,6 +536,37 @@
 (define ieee_roundToZero fltruncate)
 (define ieee_roundToPos flfloor)
 (define ieee_roundToNeg flceiling)
+
+(define ieee_nextUp
+  (let* ([minc
+          (lambda (x)
+            (let* ([v (decode-float x)]
+                    [s (vector-ref v 0)]
+                    [m (vector-ref v 1)]
+                    [e (vector-ref v 2)])
+              (encode-float s (1+ m) e)))]
+         [mdec
+          (lambda (x)
+            (let* ([v (decode-float x)]
+                   [s (vector-ref v 0)]
+                   [m (vector-ref v 1)]
+                   [e (vector-ref v 2)])
+              (encode-float s (1- m) e)))])
+    (lambda (x)
+      (if (flnan? x) +nan.0
+          ;not nan
+          (if (flnegative? x)
+              ;negative
+              (if (flinfinite? x)
+                  ieee_smallest_finite_number
+                  (mdec x))
+              ;not negative
+              (if (flzero? x)
+                  ieee_smallest_positive_number
+                  (if (flinfinite? x) +inf.0
+                      (minc x))))))))
+
+(define ieee_negate fl-)
 
 ;(define ieee_isSignMinus ($primitive flonum-sign))
 (define ieee_isSignMinus #%$flonum-sign)

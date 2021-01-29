@@ -786,6 +786,11 @@ prim__roundToPos_Double : Double -> Double
 %foreign "scheme:ieee_roundToNeg"
 prim__roundToNeg_Double : Double -> Double
 
+%foreign "scheme:ieee_nextUp"
+prim__nextUp_Double : Double -> Double
+
+%foreign "scheme:ieee_negate"
+prim__ieee_negate_Double : Double -> Double
 
 %foreign "scheme:ieee_isSignMinus"
 prim__isSignMinus_Double : Double -> Int
@@ -824,17 +829,36 @@ Supported_IEEE : Type -> Prop
 Supported_IEEE a = Element (Supported_IEEE' a) Supported_IEEE'_is_prop
 
 public export
---[DefaultIEEE] IEEE IEEE_Types IEEE_ty where
 [DefaultIEEE] IEEE Supported_IEEE where
-  fmt Double @{DoubleSupported} = binary64 -- TODO: Is it really the same for *all* backends?
-  logBty Double @{DoubleSupported} = Integer -- TODO: Is it the same for all backends? Is Integer large enough?
+  fmt _ @{DoubleSupported} = binary64 -- TODO: Is it really the same for *all* backends?
+  logBty _ @{DoubleSupported} = Integer -- TODO: Is it the same for all backends? Is Integer large enough?
   roundToIntegral NearestTiesToEven @{DoubleSupported} = prim__roundTiesToEven_Double
   roundToIntegral NearestTiesAwayFromZero @{DoubleSupported} = prim__roundTiesAwayFromZero_Double
   roundToIntegral TowardZero @{DoubleSupported} = prim__roundToZero_Double
   roundToIntegral TowardPositive @{DoubleSupported} = prim__roundToPos_Double
   roundToIntegral TowardNegative @{DoubleSupported} = prim__roundToNeg_Double
-  roundToIntegralExact {rdm} = roundToIntegral {supported=Supported_IEEE} rdm
-  negate = ?negate_hole
+  roundToIntegralExact = roundToIntegral @{DefaultIEEE} rdm
+  nextUp @{DoubleSupported} = prim__nextUp_Double
+  remainder @{DoubleSupported} = ?remainder_hole
+  quantize @{rdm} @{DoubleSupported} = ?quantize_hole
+  quantum @{DoubleSupported} = ?quantum_hole
+  scaleB @{rdm} @{DoubleSupported} = ?scaleB_hole
+  logB @{DoubleSupported} = ?logB_hole
+  addition @{rdm} @{DoubleSupported} @{DoubleSupported} @{DoubleSupported} = ?addition_hole
+  subtraction @{rdm} @{DoubleSupported} @{DoubleSupported} @{DoubleSupported} = ?subtraction_hole
+  multiplication @{rdm} @{DoubleSupported} @{DoubleSupported} @{DoubleSupported} = ?multiplication_hole
+  division @{rdm} @{DoubleSupported} @{DoubleSupported} @{DoubleSupported} = ?division_hole
+  squareRoot @{rdm} @{DoubleSupported} @{DoubleSupported} = ?squareRoot_hole
+  fusedMultiplyAdd @{rdm} @{DoubleSupported} @{DoubleSupported} @{DoubleSupported} @{DoubleSupported} = ?fusedMultiplyAdd_hole
+  convertFromInt @{rdm} @{DoubleSupported} = ?convertFromInt_hole
+  convertToInteger rdm @{DoubleSupported} = ?convertToInteger_hole
+  convertToIntegerExact rdm @{DoubleSupported} = ?convertToIntegerExact_hole
+  convertFormat @{rdm} @{DoubleSupported} @{DoubleSupported} = ?convertFormat_hole
+  convertFromDecimalCharacter @{rdm} @{DoubleSupported} = ?convertFromDecimalCharacter_hole
+  convertToDecimalCharacter @{rdm} cspec @{DoubleSupported} = ?convertToDecimalCharacter_hole cspec
+  convertFromHexCharacter @{rdm} @{DoubleSupported} = ?convertFromHexCharacter_hole
+  convertToHexCharacter @{rdm} cspec @{DoubleSupported} = ?convertToHexCharacter_hole cspec
+  negate @{DoubleSupported} = prim__ieee_negate_Double
   abs = ?abs_hole
   isSignMinus @{DoubleSupported} = intToBool . prim__isSignMinus_Double
   isNormal @{DoubleSupported} = intToBool . prim__isNormal_Double
