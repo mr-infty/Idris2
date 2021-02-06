@@ -10,6 +10,7 @@ import Prelude.Num
 import Prelude.Show
 import Prelude.Types
 import Data.Fin
+import Data.So
 import Data.Vect
 import Data.DPair
 
@@ -27,6 +28,16 @@ Prop = Subset Type IsProp
 public export
 Cast Prop Type where
   cast = fst
+
+public export
+interface FamilyOfProps (f : Type -> Type) where
+  valuedInProp : (a : Type) -> IsProp (f a)
+  
+----------------------------
+-- Exceptions (Section 7) --
+----------------------------
+
+
 
 -- Some notes to myself:
 --
@@ -70,9 +81,18 @@ record FloatFormat where
   emax : Integer
   emin : Integer -- equals 1-emax for basic formats
 
+--TODO: Fix this
+public export
+record EncodingParameters where
+  constructor MkEncodingParams
+  bias : Integer
+  expWidth : Nat
+  trailing : Nat
+  storageWidth : Nat
+
 --------------------------------------------
 -- Basic Floaing-Point Format (Table 3.2) --
--- -----------------------------------------
+--------------------------------------------
 
 public export
 binary32 : FloatFormat
@@ -93,6 +113,27 @@ decimal64 = MkFloatFormat Ten 16 384 (1 - 384)
 public export
 decimal128 : FloatFormat
 decimal128 = MkFloatFormat Ten 34 6144 (1 - 6144)
+
+----------------------------------------------
+-- Interchange formats (Tables 3.5 and 3.6) --
+----------------------------------------------
+
+public export
+binary : (k : Nat) ->
+         {auto atLeast128 : So (k >= 128)} ->
+         {auto multipleOf32 : (m : Nat ** k = 32 * m)} ->
+         FloatFormat
+binary k @{pf} @{(m ** pf')} = ?binary_hole
+
+public export
+decimal : (k : Nat) ->
+          {auto atLeast32 : So (k >= 32)} ->
+          {auto multipleOf32 : (m : Nat ** (k = 32 * m))} ->
+          FloatFormat
+decimal k @{pf} @{(m ** pf')} = ?decimal_hole
+
+
+
 
 public export
 data Sign = Positive | Negative
@@ -201,10 +242,10 @@ record ConversionSpec where
 
 ||| The `IEEE` interface defines operations on numbers which are IEEE-754 floating-point numbers.
 public export
-interface IEEE (supported : Type -> Prop) where
+interface FamilyOfProps supported => IEEE (supported : Type -> Type) where
   ||| The format of the floating-point type.
   fmt : (0 a : Type) ->
-        cast $ supported a =>
+        supported a =>
         FloatFormat
 
   ||| The format of the values returned by `logB`.
@@ -213,7 +254,7 @@ interface IEEE (supported : Type -> Prop) where
   ||| from `-2*(emax (fmt i) + prec (fmt i))` to `2*(emax (fmt i) + prec (fmt i))`
   ||| faithfully.
   logBty : (0 a : Type) ->
-           cast $ supported a =>
+           supported a =>
            Type
 
   ------------------------------
@@ -226,7 +267,7 @@ interface IEEE (supported : Type -> Prop) where
   ||| Note: Zero operands are rounded to zero results of the same sign, and likewise
   ||| infinite operands are rounded to infinite results of the same sign.
   roundToIntegral : RoundingMode ->
-                    cast $ supported a =>
+                    supported a =>
                     a -> a
 
   -- TODO: Add exceptions...
@@ -237,7 +278,7 @@ interface IEEE (supported : Type -> Prop) where
   ||| Note: Zero operands are rounded to zero results of the same sign, and likewise
   ||| infinite operands are rounded to infinite results of the same sign.
   roundToIntegralExact : {auto rdm : RoundingMode} ->
-                         cast $ supported a =>
+                         supported a =>
                          a -> a
 
   -- TODO: Which order relation is implied here?
@@ -250,7 +291,7 @@ interface IEEE (supported : Type -> Prop) where
   |||    - `+inf` if `x` is `+inf`,
   |||    - the smallest finite number if `x` is `-inf`, and
   |||    - a NaN if `x` is a NaN.
-  nextUp : cast $ supported a =>
+  nextUp : supported a =>
            a -> a
 
   -- TODO: Should this be kept part of the interface or made an auxillary function?
@@ -265,7 +306,7 @@ interface IEEE (supported : Type -> Prop) where
   |||    - a NaN if `x` is a NaN.
   |||
   ||| Note: `nextDown x` equals `negate (nextUp (negate x))`.
-  nextDown : cast $ supported a =>
+  nextDown : supported a =>
              a -> a
   nextDown x = negate {supported=supported} (nextUp {supported=supported} (negate {supported=supported} x))
 
@@ -282,80 +323,80 @@ interface IEEE (supported : Type -> Prop) where
   ||| In particular, the floating-point number is uniquely determined by
   ||| the above equation unless `r` is zero. In that case, `r` is taken
   ||| to have the same sign as `x`.
-  remainder : cast $ supported a =>
+  remainder : supported a =>
               a -> a -> a
 
   ------------------------------
   -- 5.3.2 Decimal operations --
   ------------------------------
   quantize : {auto rdm : RoundingMode} ->
-             cast $ supported a =>
+             supported a =>
              a -> a -> a
-  quantum : cast $ supported a =>
+  quantum : supported a =>
             a -> a
 
   ---------------------------------
   -- 5.3.3 logBFormat operations --
   ---------------------------------
   scaleB : {auto rdm : RoundingMode} ->
-           cast $ supported a =>
+           supported a =>
            a -> logBty a -> a
-  logB : cast $ supported a =>
+  logB : supported a =>
          a -> logBty a
 
   ---------------------------------
   -- 5.4.1 Arithmetic operations --
   ---------------------------------
   addition : {auto rmd : RoundingMode} ->
-             cast $ supported a =>
-             cast $ supported a' =>
-             cast $ supported b =>
+             supported a =>
+             supported a' =>
+             supported b =>
              (radix (fmt a) = radix (fmt b)) =>
              (radix (fmt a') = radix (fmt b)) =>
              a -> a' -> b
   subtraction : {auto rmd : RoundingMode} ->
-                cast $ supported a =>
-                cast $ supported a' =>
-                cast $ supported b =>
+                supported a =>
+                supported a' =>
+                supported b =>
                 (radix (fmt a) = radix (fmt b)) =>
                 (radix (fmt a') = radix (fmt b)) =>
                 a -> a' -> b
   multiplication : {auto rmd : RoundingMode} ->
-                   cast $ supported a =>
-                   cast $ supported a' =>
-                   cast $ supported b =>
+                   supported a =>
+                   supported a' =>
+                   supported b =>
                    (radix (fmt a) = radix (fmt b)) =>
                    (radix (fmt a') = radix (fmt b)) =>
                    a -> a' -> b
   division : {auto rmd : RoundingMode} ->
-             cast $ supported a =>
-             cast $ supported a' =>
-             cast $ supported b =>
+             supported a =>
+             supported a' =>
+             supported b =>
              (radix (fmt a) = radix (fmt b)) =>
              (radix (fmt a') = radix (fmt b)) =>
              a -> a' -> b
   squareRoot : {auto rmd : RoundingMode} ->
-               cast $ supported a =>
-               cast $ supported b =>
+               supported a =>
+               supported b =>
                (radix (fmt a) = radix (fmt b)) =>
                a -> b
   fusedMultiplyAdd : {auto rmd : RoundingMode} ->
-                     cast $ supported a =>
-                     cast $ supported a' =>
-                     cast $ supported a'' =>
-                     cast $ supported b =>
+                     supported a =>
+                     supported a' =>
+                     supported a'' =>
+                     supported b =>
                      (radix (fmt a) = radix (fmt a')) =>
                      (radix (fmt a') = radix (fmt b)) =>
                      (radix (fmt a'') = radix (fmt b)) =>
                      a -> a' -> a'' -> b
   convertFromInt : {auto rdm : RoundingMode} ->
-                   cast $ supported a =>
+                   supported a =>
                    Integer -> a
   convertToInteger : RoundingMode ->
-                     cast $ supported a =>
+                     supported a =>
                      a -> Integer
   convertToIntegerExact : RoundingMode ->
-                          cast $ supported a =>
+                          supported a =>
                           a -> Integer
 
   ------------------------------------------------------------------------
@@ -363,37 +404,43 @@ interface IEEE (supported : Type -> Prop) where
   -- character sequences                                                --
   ------------------------------------------------------------------------
   convertFormat : {auto rdm : RoundingMode} ->
-                  cast $ supported a =>
-                  cast $ supported b =>
+                  supported a =>
+                  supported b =>
                   a -> b
   convertFromDecimalCharacter : {auto rmd : RoundingMode} ->
-                                cast $ supported a =>
+                                supported a =>
                                 List DecChar -> a
   convertToDecimalCharacter : {auto rmd : RoundingMode} ->
                               ConversionSpec ->
-                              cast $ supported a =>
+                              supported a =>
                               a -> List DecChar
 
   ----------------------------------------------------
   -- 5.4.3 Conversion operations for binary formats --
   ----------------------------------------------------
   convertFromHexCharacter : {auto rmd : RoundingMode} ->
-                            cast $ supported a =>
+                            supported a =>
+                            radix (fmt a) = Two =>
                             List HexChar -> a
   convertToHexCharacter : {auto rmd : RoundingMode} ->
                           ConversionSpec ->
-                          cast $ supported a =>
+                          supported a =>
+                          radix (fmt a) = Two =>
                           a -> List HexChar
 
   -------------------------------
   -- 5.5.1 Sign bit operations --
   -------------------------------
-  negate : cast $ supported a =>
+
+  -- copy
+  --TODO: These operations are only necessary required for arithmetic interchange formats.
+  negate : supported a =>
            a -> a
-  abs : cast $ supported a =>
+  abs : supported a =>
         a -> a
-  copySign : cast $ supported a =>
+  copySign : supported a =>
              a -> a -> a
+
   ------------------------------------------
   -- 5.5.2 Decimal re-encoding operations --
   ------------------------------------------
@@ -408,13 +455,13 @@ interface IEEE (supported : Type -> Prop) where
   -- 5.6.1 Comparisions --
   ------------------------
   compareQuiet : --{auto i,j : supportedType} ->
-                 cast $ supported a =>
-                 cast $ supported a' =>
+                 supported a =>
+                 supported a' =>
                  (radix (fmt a) = radix (fmt a')) =>
                  a -> a' -> Maybe Ordering
   compareSignaling : --{auto i,j : supportedType} ->
-                     cast $ supported a =>
-                     cast $ supported a' =>
+                     supported a =>
+                     supported a' =>
                      (radix (fmt a) = radix (fmt a')) =>
                      a -> a' -> Maybe Ordering
   ----------------------------------
@@ -428,7 +475,7 @@ interface IEEE (supported : Type -> Prop) where
   -- 5.7.2 General operations --
   ------------------------------
   ||| The class a floating-point number falls into.
-  floatClass : cast $ supported a =>
+  floatClass : supported a =>
                a -> FloatClass
   floatClass x = if isSignaling {supported=supported} x then SignalingNaN
                  else if isNaN {supported=supported} x then QuietNaN
@@ -443,7 +490,7 @@ interface IEEE (supported : Type -> Prop) where
                                           else PositiveSubnormal
 
   ||| Returns true if the floating-point number has a negative sign.
-  isSignMinus : cast $ supported a =>
+  isSignMinus : supported a =>
                 a -> Bool
   isSignMinus x = case floatClass {supported=supported} x of
                        NegativeInfinity => True
@@ -453,7 +500,7 @@ interface IEEE (supported : Type -> Prop) where
                        _ => False
 
   ||| Returns true if the floating-point number is normal.
-  isNormal : cast $ supported a =>
+  isNormal : supported a =>
              a -> Bool
   isNormal x = case floatClass {supported=supported} x of
                     NegativeNormal => True
@@ -461,12 +508,12 @@ interface IEEE (supported : Type -> Prop) where
                     _ => False
 
   ||| Returns true if the floating-point number is finite.
-  isFinite : cast $ supported a =>
+  isFinite : supported a =>
              a -> Bool
   isFinite x = isZero {supported=supported} x || isSubnormal {supported=supported} x || isNormal {supported=supported} x
 
   ||| Returns true if the floating-point number is zero.
-  isZero : cast $ supported a =>
+  isZero : supported a =>
            a -> Bool
   isZero x = case floatClass {supported=supported} x of
                   NegativeZero => True
@@ -474,7 +521,7 @@ interface IEEE (supported : Type -> Prop) where
                   _ => False
 
   ||| Returns true if the floating-point number is subnormal.
-  isSubnormal : cast $ supported a =>
+  isSubnormal : supported a =>
                 a -> Bool
   isSubnormal x = case floatClass {supported=supported} x of
                        NegativeSubnormal => True
@@ -483,7 +530,7 @@ interface IEEE (supported : Type -> Prop) where
 
   -- WARNING: isInfinite x /= not (isFinite x) in general.
   ||| Returns true if the floating-point number is infinite.
-  isInfinite : cast $ supported a =>
+  isInfinite : supported a =>
                a -> Bool
   isInfinite x = case floatClass {supported=supported} x of
                       NegativeInfinity => True
@@ -492,7 +539,7 @@ interface IEEE (supported : Type -> Prop) where
 
   -- WARNING: The set of NaN consists of more than one element.
   ||| Returns true if the floating-point number is a NaN.
-  isNaN : cast $ supported a =>
+  isNaN : supported a =>
           a -> Bool
   isNaN x = case floatClass {supported=supported} x of
                  SignalingNaN => True
@@ -500,22 +547,28 @@ interface IEEE (supported : Type -> Prop) where
                  _ => False
 
   ||| Returns true if the floating-point number is a signaling NaN.
-  isSignaling : cast $ supported a =>
+  isSignaling : supported a =>
                 a -> Bool
   isSignaling x = case floatClass {supported=supported} x of
                        SignalingNaN => True
                        _ => False
-  -- radix
-  isCanonical : cast $ supported a =>
+  isCanonical : supported a =>
                 a -> Bool
-  totalOrder : cast $ supported a =>
+  radixOf : supported a =>
+            a -> Radix
+  --TODO: (Re-)Move this.
+  radixOfCorrect : supported a =>
+                   (x : a) -> (radixOf x = radix (fmt {a=a}))
+  totalOrder : supported a =>
                a -> a -> Bool
-  -- totalOrderMag
+  totalOrderMag : supported a =>
+                  a -> a -> Bool
+  totalOrderMag x y = totalOrder {supported=supported} (abs {supported=supported} x) (IEEE754.abs {supported=supported} y)
 
   -----------------------------
   -- 5.7.3 Decimal operation --
   -----------------------------
-  sameQuantum : cast $ supported a =>
+  sameQuantum : supported a =>
                 (radix (fmt a) = Ten) =>
                 a -> a -> Bool
 
@@ -535,186 +588,186 @@ interface IEEE supported => IEEE_Rec supported where
   -- 9.2 Additional mathematical operations --
   --------------------------------------------
   exp : {auto rdm : RoundingMode} ->
-        cast $ supported a =>
+        supported a =>
         a -> a
   expm1 : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   exp2 : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   exp2m1 : {auto rdm : RoundingMode} ->
-           cast $ supported a =>
+           supported a =>
            a -> a
   exp10 : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   exp10m1 : {auto rdm : RoundingMode} ->
-            cast $ supported a =>
+            supported a =>
             a -> a
   log : {auto rdm : RoundingMode} ->
-        cast $ supported a =>
+        supported a =>
         a -> a
   log2 : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   log10 : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   logp1 : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   log2p1 : {auto rdm : RoundingMode} ->
-           cast $ supported a =>
+           supported a =>
            a -> a
   log10p1 : {auto rdm : RoundingMode} ->
-            cast $ supported a =>
+            supported a =>
             a -> a
   hypot : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   rsqrt : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   compound : {auto rdm : RoundingMode} ->
-             cast $ supported a =>
+             supported a =>
              a -> Integer -> a
   rootn : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> Integer -> a
   pown : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> Integer -> a
   pow : {auto rdm : RoundingMode} ->
-        cast $ supported a =>
+        supported a =>
         a -> a -> a
   powr : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a -> a
   sin : {auto rdm : RoundingMode} ->
-        cast $ supported a =>
+        supported a =>
         a -> a
   cos : {auto rdm : RoundingMode} ->
-        cast $ supported a =>
+        supported a =>
         a -> a
   tan : {auto rdm : RoundingMode} ->
-        cast $ supported a =>
+        supported a =>
         a -> a
   sinPi : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   cosPi : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   tanPi : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   asin : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   acos : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   atan : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   atan2 : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a -> a
   asinPi : {auto rdm : RoundingMode} ->
-           cast $ supported a =>
+           supported a =>
            a -> a
   acosPi : {auto rdm : RoundingMode} ->
-           cast $ supported a =>
+           supported a =>
            a -> a
   atanPi : {auto rdm : RoundingMode} ->
-           cast $ supported a =>
+           supported a =>
            a -> a
   atan2Pi : {auto rdm : RoundingMode} ->
-            cast $ supported a =>
+            supported a =>
             a -> a -> a
   sinh : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   cosh : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   tanh : {auto rdm : RoundingMode} ->
-         cast $ supported a =>
+         supported a =>
          a -> a
   asinh : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   acosh : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   atanh : {auto rdm : RoundingMode} ->
-          cast $ supported a =>
+          supported a =>
           a -> a
   ------------------------------
   -- 9.4 Reduction operations --
   ------------------------------
-  sum : cast $ supported a =>
+  sum : supported a =>
         Vect n a -> a
-  dot : cast $ supported a =>
+  dot : supported a =>
         Vect n a ->
         Vect n a ->
         a
-  sumSquare : cast $ supported a =>
+  sumSquare : supported a =>
               Vect n a -> a
-  sumAbs : cast $ supported a =>
+  sumAbs : supported a =>
            Vect n a -> a
-  scaledProd : cast $ supported a =>
+  scaledProd : supported a =>
                Vect n a -> (a, Integer)
-  scaledProdSum : cast $ supported a =>
+  scaledProdSum : supported a =>
                   Vect n a ->
                   Vect n a ->
                   (a, Integer)
-  scaledProdDiff : cast $ supported a =>
+  scaledProdDiff : supported a =>
                    Vect n a ->
                    Vect n a ->
                    (a, Integer)
   -----------------------------------------
   -- 9.5 Augmented arithmetic operations --
   -----------------------------------------
-  augmentedAddition : cast $ supported a =>
+  augmentedAddition : supported a =>
                       (radix (fmt {supported=supported} a) = Two) =>
                       a -> a -> (a,a)
-  augmentedSubtraction : cast $ supported a =>
+  augmentedSubtraction : supported a =>
                          (radix (fmt {supported=supported} a) = Two) =>
                          a -> a -> (a,a)
-  augmentedMultiplication : cast $ supported a =>
+  augmentedMultiplication : supported a =>
                             (radix (fmt {supported=supported} a) = Two) =>
                             a -> a -> (a,a)
 
   ----------------------------------------
   -- 9.6 Minimum and maximum operations --
   ----------------------------------------
-  minimum : cast $ supported a =>
+  minimum : supported a =>
             a -> a -> a
-  minimumNumber : cast $ supported a =>
+  minimumNumber : supported a =>
                   a -> a -> a
-  maximum : cast $ supported a =>
+  maximum : supported a =>
             a -> a -> a
-  maximumNumber : cast $ supported a =>
+  maximumNumber : supported a =>
                   a -> a -> a
-  minimumMagnitude : cast $ supported a =>
+  minimumMagnitude : supported a =>
                      a -> a -> a
-  minimumMagnitudeNumber : cast $ supported a =>
+  minimumMagnitudeNumber : supported a =>
                            a -> a -> a
-  maximumMagnitude : cast $ supported a =>
+  maximumMagnitude : supported a =>
                      a -> a -> a
-  maximumMagnitudeNumber : cast $ supported a =>
+  maximumMagnitudeNumber : supported a =>
                            a -> a -> a
 
   --------------------------------
   -- 9.7 NaN payload operations --
   --------------------------------
-  getPayload : cast $ supported a =>
+  getPayload : supported a =>
                a -> a
-  setPayload : cast $ supported a =>
+  setPayload : supported a =>
                a -> a
-  setPayloadSignaling : cast $ supported a =>
+  setPayloadSignaling : supported a =>
                         a -> a
 
 ----------------------------------------------
@@ -726,14 +779,14 @@ interface IEEE supported => IEEE_Rec supported where
 public export
 positiveZero : {supported : _} ->
                IEEE supported =>
-               cast $ supported a =>
+               supported a =>
                a
 positiveZero {supported} = convertFromInt {supported=supported} 0
 
 public export
 negativeZero : {supported : _} ->
                IEEE supported =>
-               cast $ supported a =>
+               supported a =>
                a
 negativeZero {supported} = negate {supported=supported} (convertFromInt {supported=supported} 0)
 
@@ -741,7 +794,7 @@ public export
 positiveInfinity : {supported : _} ->
                    {a : _} ->
                    IEEE supported =>
-                   cast $ supported a =>
+                   supported a =>
                    a
 positiveInfinity {supported} {a} = division {supported=supported}
                                             (convertFromInt {supported=supported} {a=a} 1)
@@ -751,7 +804,7 @@ public export
 negativeInfinity : {supported : _} ->
                    {a : _} ->
                    IEEE supported =>
-                   cast $ supported a =>
+                   supported a =>
                    a
 negativeInfinity {supported} {a} = division {supported=supported}
                                             (convertFromInt {supported=supported} {a=a} 1)
@@ -760,10 +813,12 @@ negativeInfinity {supported} {a} = division {supported=supported}
 -----------------------
 -- Useful predicates --
 -----------------------
+
+--TODO: This is not a prop, because convertFromInt is not an embedding.
 public export
 isIntegral : {supported : _} ->
              IEEE supported =>
-             cast $ supported a =>
+             supported a =>
              a -> Type
 isIntegral {supported} x = (n : Integer ** x = convertFromInt {supported=supported} n)
 
@@ -817,16 +872,16 @@ prim__isNaN_Double : Double -> Int
 prim__isSignaling_Double : Double -> Int
 
 public export
-data Supported_IEEE' : Type -> Type where
-  DoubleSupported : Supported_IEEE' Double
+data Supported_IEEE : Type -> Type where
+  DoubleSupported : Supported_IEEE Double
 
-Supported_IEEE'_is_prop : {0 a : _} ->
-                          (x : Supported_IEEE' a) -> (y : Supported_IEEE' a) -> x = y
-Supported_IEEE'_is_prop DoubleSupported DoubleSupported = Refl
+Supported_IEEE_is_prop : {0 a : _} ->
+                          (x : Supported_IEEE a) -> (y : Supported_IEEE a) -> x = y
+Supported_IEEE_is_prop DoubleSupported DoubleSupported = Refl
 
 public export
-Supported_IEEE : Type -> Prop
-Supported_IEEE a = Element (Supported_IEEE' a) Supported_IEEE'_is_prop
+FamilyOfProps Supported_IEEE where
+  valuedInProp a = Supported_IEEE_is_prop
 
 public export
 [DefaultIEEE] IEEE Supported_IEEE where
@@ -859,7 +914,9 @@ public export
   convertFromHexCharacter @{rdm} @{DoubleSupported} = ?convertFromHexCharacter_hole
   convertToHexCharacter @{rdm} cspec @{DoubleSupported} = ?convertToHexCharacter_hole cspec
   negate @{DoubleSupported} = prim__ieee_negate_Double
-  abs = ?abs_hole
+  abs @{DoubleSupported} = ?abs_hole
+  copySign @{DoubleSupported} = ?copySign_hole
+
   isSignMinus @{DoubleSupported} = intToBool . prim__isSignMinus_Double
   isNormal @{DoubleSupported} = intToBool . prim__isNormal_Double
   isFinite @{DoubleSupported} = intToBool . prim__isFinite_Double
