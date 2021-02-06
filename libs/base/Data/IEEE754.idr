@@ -32,7 +32,7 @@ Cast Prop Type where
 public export
 interface FamilyOfProps (f : Type -> Type) where
   valuedInProp : (a : Type) -> IsProp (f a)
-  
+ 
 ----------------------------
 -- Exceptions (Section 7) --
 ----------------------------
