@@ -47,6 +47,8 @@ interface FamilyOfProps (f : Type -> Type) where
 -- 2. It would be very convenient if there was a way to convert a floating-point data representation to a
 --    floating-point datum. The standard somehow implies that this is possible (i.e. encode and decode),
 --    however it's not explicitly part of the standard itself.
+--
+-- 2. It's possible to have an implementation of this standard *entirely* in software (see SoftFP from Fabrice Bellard). Thus, it would be desirable to have one in Idris too so that those functions not supported by the underlying backend in a reasonable way could default back to the software implementation.
 
 -------------------------------------------------------------
 -- Float data representations (IEEE Specification Level 3) --
@@ -64,7 +66,8 @@ public export
 Digit : {rdx : Radix} -> Type
 Digit {rdx} = Fin (radixToNat rdx)
 
--- TODO: Move DecChar and HexChar somewhere else; this should only be stuff related to FDR
+-- TODO: Move DecChar and HexChar somewhere else; this should only be stuff related to FDR.
+--       Replace (=== True) by So.
 public export
 DecChar : Type
 DecChar = Subset Char ((=== True) . isDigit) --(c : Char ** isDigit c = True)
@@ -79,7 +82,9 @@ record FloatFormat where
   radix : Radix
   prec : Nat
   emax : Integer
-  emin : Integer -- equals 1-emax for basic formats
+
+emin : FloatFormat -> Integer
+emin f = 1 - (emax f)
 
 --TODO: Fix this
 public export
@@ -96,34 +101,79 @@ record EncodingParameters where
 
 public export
 binary32 : FloatFormat
-binary32 = MkFloatFormat Two 24 127 (1 - 127)
+binary32 = MkFloatFormat Two 24 127
 
 public export
 binary64 : FloatFormat
-binary64 = MkFloatFormat Two 53 1023 (1 - 1023)
+binary64 = MkFloatFormat Two 53 1023
 
 public export
 binary128 : FloatFormat
-binary128 = MkFloatFormat Two 113 16383 (1 - 16383)
+binary128 = MkFloatFormat Two 113 16383
 
 public export
 decimal64 : FloatFormat
-decimal64 = MkFloatFormat Ten 16 384 (1 - 384)
+decimal64 = MkFloatFormat Ten 16 384
 
 public export
 decimal128 : FloatFormat
-decimal128 = MkFloatFormat Ten 34 6144 (1 - 6144)
+decimal128 = MkFloatFormat Ten 34 6144
 
 ----------------------------------------------
 -- Interchange formats (Tables 3.5 and 3.6) --
 ----------------------------------------------
 
 public export
-binary : (k : Nat) ->
-         {auto atLeast128 : So (k >= 128)} ->
-         {auto multipleOf32 : (m : Nat ** k = 32 * m)} ->
-         FloatFormat
-binary k @{pf} @{(m ** pf')} = ?binary_hole
+data BinaryDigit : Type 
+
+public export
+partial
+h : (a : Int) -> (Int, Int)
+h a = g 0 1 where
+  g : (m : Int) -> (x : Int) -> (Int, Int)
+  g m x = let m' = m+1
+              x' = x*2 in
+              if x' > a
+                 then (m,x)
+                 else g m' x'
+
+--public export
+--binary : (k : Nat) ->
+--         {auto atLeast128 : So (k >= 128)} ->
+--         {auto multipleOf32 : (m : Nat ** k = 32 * m)} ->
+--         FloatFormat
+--binary k @{pf} @{(m ** pf')} = let p = computePrec k
+--                                   emax = 2 ^ (k `minus` (S p)) in
+--                                   MkFloatFormat Two p emax where
+--  partial
+--  ||| Returns (m,2^m) with `m` maximal such that `2^m <= a`.
+--  f : (a : Nat) -> (Nat, Nat)
+--  f a = g Z (S Z) where
+--    g : (m : Nat) -> (x : Nat) -> (Nat, Nat)
+--    g m x = let m' = (S m)
+--                x' = 2*x in
+--                if x' > a
+--                   then (m,x)
+--                   else g m' x'
+--  -- The precision is given by
+--  --     p = k - roundTiesToEven(4 * log2(k)) + 13.
+--  -- In other words, the integer
+--  --     m := k - p + 13 = roundTiesToEven(log2(k^4))
+--  -- is the unique integer such that
+--  --    | k^4 - 2^m |
+--  -- is minimal and m is even if this minimum isn't unique.
+--  computePrec : Nat -> Nat
+--  computePrec k = let x = k ^ 4
+--                      (m,y) = f x
+--                      d = x `minus` y
+--                      d' = (2*y) `minus` x in
+--                      if lt d d'
+--                         then (k+13) `minus` m
+--                         else if lt d' d
+--                              then (k+13) `minus` (S m)
+--                              else case half m of
+--                                        HalfOdd _ => S m
+--                                        HalfEven _ => m
 
 public export
 decimal : (k : Nat) ->
