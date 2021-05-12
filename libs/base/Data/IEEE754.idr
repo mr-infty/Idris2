@@ -139,7 +139,7 @@ isFinite = intToBool . prim__isFinite
 isZero = intToBool . prim__isZero
 isNormal x = (isFinite x) && not (isZero x) && (abs x) >= smallestPositiveNormalNumber
 isSubnormal x = (isFinite x) && not (isZero x) && (abs x) < smallestPositiveNormalNumber
-smallestPositiveNormalNumber = encodeFloat Positive (MkMantissa 4503599627370496) minExponent --4503599627370496 = 2 ** 52 
+smallestPositiveNormalNumber = encodeFloat Positive (MkMantissa 4503599627370496) minExponent --4503599627370496 = 2 ** 52
 smallestPositiveNumber = encodeFloat Positive (MkMantissa 1) minExponent
 biggestNegativeNumber = negate smallestPositiveNumber
 biggestFiniteNumber = encodeFloat Positive maxMantissa maxExponent
