@@ -108,19 +108,24 @@ public export
 epsilon : Double
 
 -- Implementation details of the floating point predicates and constants
-%foreign "scheme:ieee_isNaN"
+%foreign "javascript:lambda: x => Number.isNaN(x) ? BigInt(1) : BigInt(0)"
+         "scheme:ieee_isNaN"
 prim__isNaN : Double -> Int
 
-%foreign "scheme:ieee_isInfinite"
+%foreign "javascript:lambda: x => Number.isFinite(x) && !Number.isNaN(x) ? BigInt(1) : BigInt(0)"
+         "scheme:ieee_isInfinite"
 prim__isInfinite : Double -> Int
 
-%foreign "scheme:ieee_isFinite"
+%foreign "javascript:lambda: x => Number.isFinite(x) ? BigInt(1) : BigInt(0)"
+         "scheme:ieee_isFinite"
 prim__isFinite : Double -> Int
 
-%foreign "scheme:ieee_isZero"
+%foreign "javascript:lambda: x => (x == 0.0) ? BigInt(1) : BigInt(0)"
+         "scheme:ieee_isZero"
 prim__isZero : Double -> Int
 
-%foreign "scheme:ieee_encodeFloat"
+%foreign "javascript:lambda: (s,m,e) => Number(s * m) * Math.pow(2, Number(e))"
+         "scheme:ieee_encodeFloat"
 prim__encodeFloat : Int -> Int -> Int -> Double
 
 encodeFloat s (MkMantissa m) (MkExponent e) = prim__encodeFloat (case s of
