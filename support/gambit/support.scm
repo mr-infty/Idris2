@@ -236,3 +236,15 @@
 
 (define (blodwen-system cmd)
   (fxarithmetic-shift-right (shell-command cmd) 8))
+
+;; floating point predicates and constants
+(define bool->int (lambda (x) (if x 1 0)))
+(define comp (lambda (f g) (lambda (x) (f (g x)))))
+
+(define ieee_isNaN (comp bool->int flnan?))
+(define ieee_isInfinite (comp bool->int flinfinite?))
+(define ieee_isFinite (comp bool->int flfinite?))
+(define ieee_isZero (comp bool->int flzero?))
+(define ieee_encodeFloat
+  (lambda (s m e)
+    (exact->inexact (* s m (expt 2 e)))))
