@@ -82,6 +82,11 @@ public export
 minusInfinity : Double
 minusInfinity = negate plusInfinity
 
+||| A NaN, i.e. a floating point number for which `isNaN` evaluates to `True`.
+public export
+aNaN : Double
+aNaN = minusInfinity + plusInfinity
+
 ||| The smallest positive floating point number. Equals the negative of `smallestPositiveNumber`.
 public export
 smallestPositiveNumber : Double
